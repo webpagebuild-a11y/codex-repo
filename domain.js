@@ -1,6 +1,7 @@
 import semver from 'semver';
 import { createHash } from 'node:crypto';
 import { catalog } from './catalog.js';
+import { dailyDue } from './schedule.js';
 export const hash = value => createHash('sha256').update(value).digest('hex');
 export const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 export const plain = value => String(value ?? '').replace(/<[^>]*>/g, ' ').replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/[#*`]/g, '').replace(/\s+/g, ' ').trim();
@@ -38,7 +39,8 @@ export function chooseDigest(items, settings, sent = new Set()) {
 }
 export function due(settings, lastSent, now = Date.now()) {
   if (!settings.enabled || !settings.email) return false;
-  return !lastSent || now - Date.parse(lastSent) >= (settings.frequency === 'weekly' ? 7 * 86400000 : settings.frequency === 'daily' ? 86400000 : 3600000);
+  if (settings.frequency === 'daily') return dailyDue(lastSent, now, process.env.DELIVERY_TIME || '08:00', process.env.DELIVERY_TIMEZONE || 'America/New_York');
+  return !lastSent || now - Date.parse(lastSent) >= (settings.frequency === 'weekly' ? 7 * 86400000 : 3600000);
 }
 export function emailBody(items) {
   return '<div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#173e37"><h1>SDET Radar</h1><p>Your stack. Only the signals that matter.</p>' + ['High','Medium','Low'].map((impact,i) => {

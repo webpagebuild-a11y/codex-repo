@@ -15,7 +15,12 @@ const files = { '/': ['index.html','text/html'], '/app.js': ['app.js','text/java
 async function body(req) { let value = ''; for await (const chunk of req) { value += chunk; if (value.length > 20000) throw new Error('Request too large.'); } return JSON.parse(value || '{}'); }
 async function runJob(sendEmail = false) {
   if (busy) throw new Error('A collection is already running.'); busy = true;
-  try { const result = await collect(store); if (sendEmail) result.delivery = await deliver(store); return result; } finally { busy = false; }
+  try {
+    const last = store.get('collection',null);
+    const result = !sendEmail || !last || Date.now() - Date.parse(last.at) >= 3600000 ? await collect(store) : { status:'already-collected' };
+    if (sendEmail) result.delivery = await deliver(store);
+    return result;
+  } finally { busy = false; }
 }
 const server = http.createServer(async (req,res) => {
   res.setHeader('X-Content-Type-Options','nosniff'); res.setHeader('Referrer-Policy','no-referrer'); res.setHeader('Cache-Control','no-store');
@@ -46,7 +51,7 @@ const server = http.createServer(async (req,res) => {
   } catch (error) { reply(400,{error:error.message}); }
 });
 if (process.env.ENABLE_SCHEDULER === 'true') {
-  const tick = () => runJob(true).catch(e => { store.set('schedulerError',{at:new Date().toISOString(),error:e.message}); console.error('Scheduled job:', e.message); });
-  setInterval(tick,3600000).unref(); setTimeout(tick,10000).unref();
+  const tick = () => { if (!busy) runJob(true).then(() => store.set('schedulerError',null)).catch(e => { store.set('schedulerError',{at:new Date().toISOString(),error:e.message}); console.error('Scheduled job:', e.message); }); };
+  setInterval(tick,60000).unref(); setTimeout(tick,10000).unref();
 }
 server.listen(port,host,() => console.log(`SDET Radar: http://${host}:${server.address().port}`));
