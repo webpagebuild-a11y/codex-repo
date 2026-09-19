@@ -1,3 +1,4 @@
+import { eligible } from './testing-policy.js';
 import semver from 'semver';
 import { createHash } from 'node:crypto';
 import { catalog } from './catalog.js';
@@ -31,10 +32,10 @@ export function validateSettings(input) {
   if (input.enabled && (!email || !input.technologies.length)) throw new Error('Add an email address and at least one technology before enabling delivery.');
   const versions = {};
   for (const t of catalog) { const v = input.versions?.[t.id]; if (v) { if (typeof v !== 'string' || v.length > 40 || !/^[\w.+-]+$/.test(v)) throw new Error('Use a version such as 1.50.0.'); versions[t.id] = v; } }
-  return { email, frequency: input.frequency, limit: input.limit, enabled: input.enabled, technologies: [...new Set(input.technologies)], versions };
+  return { testingOnly: input.testingOnly !== false, includeUpcoming: input.includeUpcoming !== false, email, frequency: input.frequency, limit: input.limit, enabled: input.enabled, technologies: [...new Set(input.technologies)], versions };
 }
 export function chooseDigest(items, settings, sent = new Set()) {
-  return items.filter(x => !x.sample && settings.technologies.includes(x.tech) && !sent.has(x.id) && (settings.frequency !== 'important' || x.impact === 'High'))
+  return items.filter(x => !x.sample && eligible(x, settings) && settings.technologies.includes(x.tech) && !sent.has(x.id) && (settings.frequency !== 'important' || x.impact === 'High'))
     .sort((a,b) => ({High:3,Medium:2,Low:1}[b.impact] - {High:3,Medium:2,Low:1}[a.impact]) || b.published.localeCompare(a.published)).slice(0, settings.limit);
 }
 export function due(settings, lastSent, now = Date.now()) {
@@ -45,6 +46,6 @@ export function due(settings, lastSent, now = Date.now()) {
 export function emailBody(items) {
   return '<div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#173e37"><h1>SDET Radar</h1><p>Your stack. Only the signals that matter.</p>' + ['High','Medium','Low'].map((impact,i) => {
     const group = items.filter(x => x.impact === impact); if (!group.length) return '';
-    return `<h2>${['Must Know','Useful','Optional'][i]}</h2>` + group.map(x => `<article style="margin:24px 0"><h3><a href="${escape(safeUrl(x.url))}">${escape(x.title)}</a></h3><p>${escape(x.summary)}</p><p>Impact: ${escape(x.impact)} · Action needed: ${x.action ? 'Yes — review source' : 'No'}</p></article>`).join('');
+    return `<h2>${['Must Know','Useful','Optional'][i]}</h2>` + group.map(x => `<article style="margin:24px 0"><h3><a href="${escape(safeUrl(x.url))}">${x.upcoming ? 'Upcoming: ' : ''}${escape(x.title)}</a></h3><p>${escape(x.summary)}</p><p>Impact: ${escape(x.impact)} · Action needed: ${x.action ? 'Yes — review source' : 'No'}</p></article>`).join('');
   }).join('') + '<hr><p>Manage delivery or turn it off in your SDET Radar app → Preferences. Ranking is advisory; verify details in the original source.</p></div>';
 }

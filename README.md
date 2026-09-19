@@ -62,3 +62,8 @@ npm test
 Tests cover ranking, digest selection, cadence, validation, feed parsing, HTML safety, SQLite deduplication, version comparison and email retry idempotency. Email tests use a fake provider; they send no real mail.
 
 Integration references: [OpenAI text generation](https://developers.openai.com/api/docs/guides/text), [Resend send email](https://resend.com/docs/api-reference/emails/send-email), [GitHub releases API](https://docs.github.com/en/rest/releases/releases).
+
+
+## Focused testing briefing
+
+The default radar tracks Selenium, Playwright, MCP, and AI-assisted testing (Playwright MCP). The strict testing gate applies to both the dashboard and email, independently of delivery frequency. It admits explicit security fixes, breaking changes/deprecations, major testing capabilities, and severe reliability fixes; routine updates and general AI/MCP news are excluded. Official prereleases and announced plans qualify only when they meet the same importance threshold and are labeled Upcoming. Dates are announcement dates, not promised launch dates. Coverage uses official release feeds and the MCP blog; it is conservative rule-based filtering, not exhaustive news monitoring. Empty days do not generate an email. Existing delivery history remains available.

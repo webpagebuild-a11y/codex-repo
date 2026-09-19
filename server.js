@@ -1,3 +1,4 @@
+import { eligible } from './testing-policy.js';
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
@@ -39,7 +40,7 @@ const server = http.createServer(async (req,res) => {
       }
       if (req.method === 'GET' && url.pathname === '/api/state') {
         const settings = store.settings(), items = store.items();
-        return reply(200,{ csrf, catalog, settings, items: items.map(x => ({ ...x, versionNote: versionNote(x,settings) })), samples, history: store.history(), collection: store.get('collection',null), schedulerError: store.get('schedulerError',null), busy, integrations: { ai: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL), email: !!(process.env.RESEND_API_KEY && process.env.EMAIL_FROM), scheduler: process.env.ENABLE_SCHEDULER === 'true' } });
+        return reply(200,{ csrf, catalog, settings, items: items.filter(x => eligible(x,settings) && settings.technologies.includes(x.tech)).map(x => ({ ...x, versionNote: versionNote(x,settings) })), samples, history: store.history(), collection: store.get('collection',null), schedulerError: store.get('schedulerError',null), busy, integrations: { ai: !!(process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL), email: !!(process.env.RESEND_API_KEY && process.env.EMAIL_FROM), scheduler: process.env.ENABLE_SCHEDULER === 'true' } });
       }
       if (req.method === 'PUT' && url.pathname === '/api/settings') { const settings = validateSettings(await body(req)); store.set('settings',settings); return reply(200,{settings}); }
       if (req.method === 'POST' && url.pathname === '/api/collect') return reply(200, await runJob());

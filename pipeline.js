@@ -1,3 +1,4 @@
+import { testingPolicy, POLICY_VERSION, eligible } from './testing-policy.js';
 import { XMLParser } from 'fast-xml-parser';
 import { catalog } from './catalog.js';
 import { classify, hash, plain, safeUrl, chooseDigest, due, emailBody } from './domain.js';
@@ -15,7 +16,7 @@ export function parseFeed(text, technology) {
   return entries.slice(0, 15).map(x => ({ title: plain(x.title?.['#text'] || x.title), body: plain(x.description || x.summary?.['#text'] || x.summary || x.content?.['#text'] || x.content), url: typeof x.link === 'string' ? x.link : array(x.link).find(l => !l['@_rel'] || l['@_rel'] === 'alternate')?.['@_href'], published: x.pubDate || x.published || x.updated, tech: technology.id, version: '' }));
 }
 export async function rank(item, config = process.env) {
-  const fallback = classify(item);
+  const fallback = testingPolicy(classify(item));
   if (!config.OPENAI_API_KEY || !config.OPENAI_MODEL) return fallback;
   try {
     const response = await request('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${config.OPENAI_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({
@@ -27,18 +28,18 @@ export async function rank(item, config = process.env) {
     const output = (data.output || []).flatMap(o => o.content || []).filter(c => c.type === 'output_text').map(c => c.text).join('');
     const result = JSON.parse(output);
     if (!['High','Medium','Low'].includes(result.impact) || !['Security','Breaking change','Release'].includes(result.kind) || typeof result.action !== 'boolean' || typeof result.summary !== 'string') throw new Error('Invalid ranking');
-    return { ...fallback, summary: result.summary.slice(0,260), impact: result.impact, action: result.action, kind: result.kind, ranking: 'AI-ranked' };
+    return testingPolicy({ ...fallback, summary: result.summary.slice(0,260), impact: result.impact, action: result.action, kind: result.kind, ranking: 'AI-ranked' });
   } catch { return { ...fallback, ranking: 'Rule-based (AI unavailable)' }; }
 }
 export async function collect(store) {
-  const settings = store.settings(), known = new Set(store.items().map(x => x.id));
+  const settings = store.settings(), known = new Set(store.items().filter(x => x.policyVersion === POLICY_VERSION).map(x => x.id));
   let added = 0; const sources = [];
   for (const technology of catalog.filter(t => settings.technologies.includes(t.id))) {
     try {
       const headers = { 'User-Agent': 'SDET-Radar', Accept: technology.source.type === 'github' ? 'application/vnd.github+json' : 'application/xml' };
       if (technology.source.type === 'github' && process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
       const response = await request(technology.source.url, { headers });
-      const entries = technology.source.type === 'github' ? (await response.json()).filter(x => !x.draft && !x.prerelease).map(x => ({ title: `${technology.name}: ${x.name || x.tag_name}`, body: plain(x.body), url: x.html_url, published: x.published_at, version: x.tag_name, tech: technology.id })) : parseFeed(await response.text(), technology);
+      const entries = technology.source.type === 'github' ? (await response.json()).filter(x => !x.draft).map(x => ({ title: `${technology.name}: ${x.name || x.tag_name}`, body: String(x.body || '').split('\n').map(plain).join('\n'), url: x.html_url, published: x.published_at, prerelease: !!x.prerelease, version: x.tag_name, tech: technology.id })) : parseFeed(await response.text(), technology);
       let count = 0;
       for (const raw of entries) {
         const url = safeUrl(raw.url), timestamp = Date.parse(raw.published);
@@ -66,6 +67,7 @@ export async function deliver(store, send = request, now = Date.now()) {
   // Persist the exact payload before sending, so a crash can be retried with the same key.
   const pending = store.history().find(h => h.status === 'pending');
   if (pending && now - Date.parse(pending.at) > 23 * 3600000) throw new Error('A delivery is unresolved. Check Resend before retrying after its idempotency window.');
+  if (pending && pending.items.some(x => !eligible(x, settings) || !settings.technologies.includes(x.tech))) throw new Error('Pending delivery predates the testing focus. Resolve it before retrying.');
   const attempt = pending || entry;
   if (attempt.email !== settings.email) throw new Error('Resolve pending delivery before changing recipient.');
   if (!pending) store.delivery(attempt);

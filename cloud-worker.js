@@ -1,3 +1,4 @@
+import { eligible } from './testing-policy.js';
 import { catalog, defaults, samples } from './catalog.js';
 import { hash, plain, safeUrl, classify, validateSettings, chooseDigest, versionNote, emailBody } from './domain.js';
 import { dailyDue } from './schedule.js';
@@ -20,7 +21,7 @@ export async function collectOne(store,env,technology,now=Date.now()) {
     const h={'User-Agent':'SDET-Radar',Accept:technology.source.type==='github'?'application/vnd.github+json':'application/xml'};
     if(technology.source.type==='github' && env.GITHUB_TOKEN)h.Authorization=`Bearer ${env.GITHUB_TOKEN}`;
     const response=await request(technology.source.url,{headers:h});
-    const entries=technology.source.type==='github'?(await response.json()).filter(x=>!x.draft&&!x.prerelease).map(x=>({title:`${technology.name}: ${x.name || x.tag_name}`,body:plain(x.body),url:x.html_url,published:x.published_at,version:x.tag_name,tech:technology.id})):parseFeed(await response.text(),technology);
+    const entries=technology.source.type==='github'?(await response.json()).filter(x=>!x.draft).map(x=>({title:`${technology.name}: ${x.name || x.tag_name}`,body:String(x.body || '').split('\n').map(plain).join('\n'),url:x.html_url,published:x.published_at,prerelease:!!x.prerelease,version:x.tag_name,tech:technology.id})):parseFeed(await response.text(),technology);
     for(const raw of entries){
       const url=safeUrl(raw.url), timestamp=Date.parse(raw.published);
       if(!url||!raw.title||!Number.isFinite(timestamp)||timestamp<now-30*86400000||timestamp>now+86400000||/\b(webinar|sponsored|register now|conference|save your seat)\b/i.test(raw.title))continue;
@@ -45,6 +46,7 @@ export async function sendCloudDigest(store,env,now=Date.now(),send=request) {
     const history=await store.history(), pending=history.find(x=>x.status==='pending');
     if(pending && now-Date.parse(pending.at)>23*3600000)throw new Error('Unresolved delivery is older than the safe retry window. Check Resend before retrying.');
     if(pending && pending.email!==settings.email)throw new Error('Resolve the pending delivery before changing recipient.');
+    if(pending && pending.items.some(x=>!eligible(x,settings)||!settings.technologies.includes(x.tech)))throw new Error('Pending delivery predates the testing focus. Resolve it before retrying.');
     const sent=new Set(history.filter(x=>x.status==='sent'&&x.email===settings.email).flatMap(x=>x.items.map(i=>i.id)));
     const items=chooseDigest((await store.items()).filter(x=>Date.parse(x.published)>now-30*86400000),settings,sent);
     if(!pending && !items.length)return {status:'no-updates'};
@@ -76,7 +78,7 @@ export default {
       if(req.method==='GET'&&url.pathname==='/api/state'){
         const [settings,items,history,sources]=await Promise.all([settingsFor(store,env),store.items(),store.history(),store.sources()]);
         const at=sources.map(x=>x.at).sort().at(-1);
-        return json({csrf,catalog,settings,items:items.map(x=>({...x,versionNote:versionNote(x,settings)})),samples,history,collection:at?{at,added:sources.reduce((sum,x)=>sum+x.count,0),sources}:null,busy:false,schedulerError:await store.get('schedulerError'),integrations:{ai:!!(env.OPENAI_API_KEY&&env.OPENAI_MODEL),email:!!(env.RESEND_API_KEY&&env.EMAIL_FROM),scheduler:env.ENABLE_SCHEDULER==='true',cloud:true}});
+        return json({csrf,catalog,settings,items:items.filter(x=>eligible(x,settings)&&settings.technologies.includes(x.tech)).map(x=>({...x,versionNote:versionNote(x,settings)})),samples,history,collection:at?{at,added:sources.reduce((sum,x)=>sum+x.count,0),sources}:null,busy:false,schedulerError:await store.get('schedulerError'),integrations:{ai:!!(env.OPENAI_API_KEY&&env.OPENAI_MODEL),email:!!(env.RESEND_API_KEY&&env.EMAIL_FROM),scheduler:env.ENABLE_SCHEDULER==='true',cloud:true}});
       }
       if(req.method==='PUT'&&url.pathname==='/api/settings'){
         const text=await req.text();if(text.length>20000)return json({error:'Request too large.'},413);

@@ -10,7 +10,7 @@ export function openStore(path = process.env.DB_PATH || 'data/radar.sqlite') {
   const set = (key, value) => db.prepare('INSERT OR REPLACE INTO kv VALUES (?,?)').run(key, JSON.stringify(value));
   return { db, get, set, settings: () => get('settings', defaults),
     items: () => db.prepare('SELECT payload FROM updates').all().map(x => JSON.parse(x.payload)),
-    add: item => db.prepare('INSERT OR IGNORE INTO updates VALUES (?,?)').run(item.id, JSON.stringify(item)).changes,
+    add: item => db.prepare('INSERT INTO updates VALUES (?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload WHERE updates.payload != excluded.payload').run(item.id, JSON.stringify(item)).changes,
     history: () => db.prepare('SELECT payload FROM deliveries ORDER BY rowid DESC').all().map(x => JSON.parse(x.payload)),
     delivery: entry => db.prepare('INSERT OR REPLACE INTO deliveries VALUES (?,?)').run(entry.id, JSON.stringify(entry)),
   };
