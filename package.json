@@ -1,0 +1,28 @@
+{
+  "name": "sdet-radar",
+  "version": "1.0.0",
+  "description": "A personal technology briefing for test automation engineers",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/webpagebuild-a11y/codex-repo.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "bugs": {
+    "url": "https://github.com/webpagebuild-a11y/codex-repo/issues"
+  },
+  "homepage": "https://github.com/webpagebuild-a11y/codex-repo#readme",
+  "dependencies": {
+    "fast-xml-parser": "^5.11.1",
+    "semver": "^7.8.5"
+  }
+}
