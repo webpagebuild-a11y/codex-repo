@@ -6,7 +6,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "cloud:build": "node build-cloud.js",
+    "cloud:deploy": "node build-cloud.js && node cloud-cli.js deploy"
   },
   "repository": {
     "type": "git",
@@ -16,7 +18,9 @@
   "author": "",
   "license": "ISC",
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "bugs": {
     "url": "https://github.com/webpagebuild-a11y/codex-repo/issues"
   },
@@ -24,5 +28,9 @@
   "dependencies": {
     "fast-xml-parser": "^5.11.1",
     "semver": "^7.8.5"
+  },
+  "devDependencies": {
+    "esbuild-wasm": "^0.28.2",
+    "wrangler": "^4.135.0"
   }
 }

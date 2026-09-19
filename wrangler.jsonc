@@ -1,0 +1,14 @@
+{
+  "name": "sdet-radar",
+  "account_id": "9b0c7244c967a792c65e058ca575f843",
+  "main": "data/cloud-build/worker.js",
+  "no_bundle": true,
+  "compatibility_date": "2026-09-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "assets": { "directory": "./cloud-assets", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
+  "triggers": { "crons": ["* * * * *"] },
+  "vars": { "ENABLE_SCHEDULER": "true", "DELIVERY_TIME": "08:00", "DELIVERY_TIMEZONE": "America/New_York", "EMAIL_FROM": "onboarding@resend.dev" },
+  "observability": { "enabled": true },
+  "d1_databases": [{ "binding": "DB", "database_name": "sdet-radar", "database_id": "15969e92-b813-491c-8548-bff0187b28f6" }]
+}

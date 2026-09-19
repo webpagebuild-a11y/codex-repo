@@ -3,3 +3,8 @@ node_modules/
 data/
 *.log
 test-results/
+.wrangler/
+.dev.vars*
+cloud-assets/
+cloud-secrets.json
+wrangler.local.json
